@@ -1,0 +1,34 @@
+# Migrated workflow catalog
+
+This catalog records maintained analysis workflows and the independent, configurable OpenMM/NAMD simulation templates migrated from the reviewed archives. Legacy system-specific production files are not copied verbatim.
+
+| Workflow | Historical source(s) reviewed | Integrated replacement | Validation status |
+|---|---|---|---|
+| Cu–S and other named atom-pair distances across trajectory frames | `holo_sim_3_coord.zip` (`yeast_I2/orient_001`–`orient_004`, `plot_bond(s).py`); selected distance time-series outputs from `holo_sim.zip` | `scripts/analyze_distance.py`, `scripts/analyze_multi_distance.py` | Tested on a synthetic MDAnalysis trajectory including PBC behavior; real-system atom selections/time units still require validation |
+| Contact/neighbor lists around cysteine or another atom/group | `neighbor_test.zip`, especially `yeast_MBD_apo_neighbor/find_neighbor_waters.py` and binding-loop `neighbor_count_by_residue.py` | `src/copper_trafficking/contacts.py`, `scripts/analyze_neighbors.py` | Tested on a synthetic PBC case; original hardcoded center/neighbor selections were removed |
+| Inter-protein residue-pair contact frequencies (contact-network edges) | `y-complex-apo-md.zip` acidic/basic distance work; neighbor/contact analysis in `neighbor_test.zip` | `residue_pair_contact_frequency()` and `--output-pair-frequency` from `scripts/analyze_neighbors.py` | Tested; one edge is counted at most once per frame regardless of atom-pair multiplicity |
+| Per-residue contact occupancy / neighbor counts | `neighbor_test.zip` water and electronegative-neighbor summaries | `residue_contact_frequency()` and neighbor-analysis CSV outputs | Tested; counts unique residues/atoms explicitly and retains zero-contact frames in the frame summary |
+| Cysteine-centered hydrogen-bond-like analyses | `yeast_chaperone_apo.zip`, `yeast_MBD_apo.zip`, `y-complex-apo-md.zip`; related scripts in `neighbor_test.zip` | `src/copper_trafficking/hydrogen_bonds.py`, `scripts/analyze_hbond_geometry.py` | Synthetic geometry tested; requires topology bonds and explicit chemical selections; real protein selections require scientific review |
+| Histogram plots from legacy distance `.dat` and generated tables | Fixed-row `histogram.py` variants in `holo_sim.zip`, apo archives, and complex archives | `scripts/plot_distance_distribution.py` | Replaces fixed sample counts with complete-file reading; CLI parsing/plot smoke-tested |
+| Backbone / custom dihedral trajectories and phi/psi-style scatter plotting | Binding-loop Ramachandran Tcl/Python helpers in `Human_chaperone_apo.zip` | `scripts/analyze_dihedrals.py`, `src/copper_trafficking/torsions.py`, `scripts/plot_ramachandran.py` | Dihedral computation covered by synthetic unit test; real atom ordering/residue continuity must be checked |
+| Fitted trajectory RMSD | Alignment helpers in `y-complex-apo-md.zip`, `yeast_chaperone_apo.zip`, `yeast_MBD_apo.zip`, Wilson MBD snapshots | `scripts/analyze_rmsd.py` | Synthetic translation test passed; input must be whole/consistently imaged and selection scientifically appropriate |
+| Group centroid/position time series to support collective-variable design | `colvar.zip` (`atom_pos.tcl`, `visualize_centroids_of_groups.tcl`, coordinate extraction scripts) | `scripts/analyze_group_position.py` | Code-reviewed; refuses to run unless the user confirms the selected group has been made whole |
+| Frame export for structural inspection and rendering | `y-complex-apo-md.zip`, `yeast_chaperone_apo.zip`, `yeast_MBD_apo.zip` DCD/PDB extraction Tcl helpers | `scripts/extract_frames.py`, `visualization/vmd/export_selected_frames.tcl` | Python CLI is integration-tested; VMD script is syntax-checked only, because VMD is not installed in the build environment |
+| Common visualization representation | Repeated VMD style/color helpers across complex/chaperone/MBD archives | `visualization/vmd/copper_trafficking_style.tcl` | Manual review only; atom names/selections must be edited for each topology and confirmed in VMD |
+| OpenMM harmonic Cu–ligand bond, angle and torsion restraints | `holo_sim.zip` (1FD8/1TL4 parameter scans); selected restraint experiments from `restrain_test.zip` | `simulation_templates/openmm/run_restraint_simulation.py` and `copper_restraints.example.json` | JSON/schema and safety-gate tests pass; OpenMM model preflight not run because OpenMM and the source system/force-field inputs were absent; example constants are not validated |
+| NAMD equilibration and NPT continuation | `y-complex-apo-md.zip`, yeast chaperone/MBD apo archives, Wilson MBD snapshots | `simulation_templates/namd/equilibration_nvt.conf.example` and `continue_npt.conf.example` | Tcl completeness and mocked-command control-flow checks pass, including optional-restraint branches; NAMD runtime validation not performed; these are generic templates and require system-specific box, topology, parameter and restart paths |
+
+## Key corrections relative to the historical scripts
+
+- All calculations use configurable atom selections instead of hidden hardcoded selections such as `protein and resid 16 and name HG1` inside functions whose arguments described a different residue.
+- Distance calculations check selection cardinality; they do not silently use element zero from a multi-atom selection.
+- Periodic correction is applied only when the frame has valid six-component unit-cell dimensions. The output reports whether it was applied.
+- The neighbor tool exports long-form atom-pair contacts plus per-frame unique-atom/residue counts; it does not collapse multiple center-atom contacts without recording them.
+- Hydrogen bonds require donor–hydrogen topology bonds and the user-specified D–A distance and D–H–A angle thresholds. Old distance-only helpers should be described as proximity screens, not geometric hydrogen-bond detection.
+- Histogram analysis reads every valid numeric sample in the input rather than relying on fixed `N` values such as 100, 500, or 1004.
+- Time scaling and offsets from old orientation plots are not hard-coded because their origins are undocumented; users must supply and report them explicitly.
+- JSON serialization of frame results is not used by the new APIs. This removes the old pattern of parsing serialized Python lists with `eval()`.
+
+## Legacy simulation files not copied verbatim
+
+The exact historical OpenMM production scripts and system-specific NAMD config sequences are not copied as the runnable recipe. Instead, new independent templates expose paths, integrators, force-field files, restraints, thermodynamic settings and output cadence as editable variables. This is safer than retaining copied numeric particle indices, giant minimization limits, legacy APIs or mixed-system paths. Read [`simulation-setups-audit.md`](simulation-setups-audit.md) for the specific model/parameter discrepancies that must be resolved before use.

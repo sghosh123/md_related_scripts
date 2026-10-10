@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "template_status": "template",
+  "metadata": {
+    "model_system": "SET_THIS_TO_YOUR_SYSTEM",
+    "description": "Generalized example informed by historical copper-restraint workflows. Numeric targets and selectors below are illustrative only, not validated parameters for a specific protein.",
+    "source_basis": "Reviewed legacy 1FD8/1TL4 OpenMM scripts; see docs/simulation-setups-audit.md"
+  },
+  "inputs": {
+    "pdb": "../../inputs/CHANGE_ME_system.pdb",
+    "forcefield_xml": [
+      "../../forcefield/CHANGE_ME_protein_and_water.xml",
+      "../../forcefield/CHANGE_ME_copper_or_custom_parameters.xml"
+    ],
+    "box_lengths_nm": null
+  },
+  "simulation": {
+    "temperature_K": 310.0,
+    "friction_per_ps": 1.0,
+    "timestep_fs": 2.0,
+    "steps": 100000,
+    "minimize_before_run": true,
+    "minimization_max_iterations": 5000,
+    "nonbonded_method": "PME",
+    "nonbonded_cutoff_nm": 1.2,
+    "switch_distance_nm": 1.0,
+    "constraints": "HBonds",
+    "rigid_water": true,
+    "remove_center_of_mass_motion": true,
+    "ewald_error_tolerance": 0.0005,
+    "pressure_bar": null,
+    "barostat_frequency_steps": 25,
+    "platform": "CPU",
+    "platform_properties": {},
+    "random_seed": 20261011,
+    "trajectory_interval_steps": 5000,
+    "log_interval_steps": 1000,
+    "checkpoint_interval_steps": 10000
+  },
+  "restraints": {
+    "bonds": [
+      {
+        "name": "Cu-S_example_1",
+        "atoms": [
+          {"chain_id": "C", "residue_id": "1", "residue_name": "CU1", "atom_name": "CU"},
+          {"chain_id": "A", "residue_id": "56", "residue_name": "CYS", "atom_name": "SG"}
+        ],
+        "r0_nm": 0.23,
+        "k_kj_mol_nm2": 2500.0,
+        "periodic": true
+      },
+      {
+        "name": "Cu-S_example_2",
+        "atoms": [
+          {"chain_id": "C", "residue_id": "1", "residue_name": "CU1", "atom_name": "CU"},
+          {"chain_id": "A", "residue_id": "63", "residue_name": "CYS", "atom_name": "SG"}
+        ],
+        "r0_nm": 0.23,
+        "k_kj_mol_nm2": 2500.0,
+        "periodic": true
+      }
+    ],
+    "angles": [
+      {
+        "name": "S-Cu-S_example",
+        "atoms": [
+          {"chain_id": "A", "residue_id": "56", "residue_name": "CYS", "atom_name": "SG"},
+          {"chain_id": "C", "residue_id": "1", "residue_name": "CU1", "atom_name": "CU"},
+          {"chain_id": "A", "residue_id": "63", "residue_name": "CYS", "atom_name": "SG"}
+        ],
+        "theta0_degrees": 120.0,
+        "k_kj_mol_rad2": 200.0,
+        "periodic": true
+      }
+    ],
+    "torsions": []
+  },
+  "outputs": {
+    "directory": "../../outputs/openmm_copper_restraints",
+    "trajectory": "trajectory.dcd",
+    "log": "thermodynamics.tsv",
+    "final_pdb": "final.pdb",
+    "checkpoint": "checkpoint.chk",
+    "final_checkpoint": "final_checkpoint.chk",
+    "atom_mapping_csv": "restraint_atom_mapping.csv",
+    "run_summary_json": "run_summary.json",
+    "write_pdb_trajectory": false,
+    "pdb_trajectory": null,
+    "enforce_periodic_box": null
+  },
+  "review_checklist": {
+    "force_field_reviewed": false,
+    "atom_mapping_reviewed": false,
+    "restraint_geometry_and_units_reviewed": false,
+    "simulation_protocol_reviewed": false
+  }
+}

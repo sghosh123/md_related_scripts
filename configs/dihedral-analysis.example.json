@@ -1,0 +1,23 @@
+{
+  "dihedrals": [
+    {
+      "label": "resid13_phi",
+      "selections": [
+        "segid PROT and resid 12 and name C",
+        "segid PROT and resid 13 and name N",
+        "segid PROT and resid 13 and name CA",
+        "segid PROT and resid 13 and name C"
+      ]
+    },
+    {
+      "label": "resid13_psi",
+      "selections": [
+        "segid PROT and resid 13 and name N",
+        "segid PROT and resid 13 and name CA",
+        "segid PROT and resid 13 and name C",
+        "segid PROT and resid 14 and name N"
+      ]
+    }
+  ],
+  "notes": "Illustrative phi/psi definitions for one residue. Verify segment, residue numbering, peptide continuity, atom names, and whether termini have all required atoms. Every selection must resolve to exactly one atom."
+}

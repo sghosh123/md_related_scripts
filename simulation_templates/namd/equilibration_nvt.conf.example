@@ -1,0 +1,202 @@
+# =============================================================================
+# GENERAL NAMD NVT EQUILIBRATION TEMPLATE — NOT A PRE-VALIDATED SYSTEM SETUP
+#
+# INSTRUCTIONS BEFORE USE:
+#   1. Edit all input paths, the complete matching CHARMM parameter list, box
+#      vectors/origin, temperatures, step counts and output settings below.
+#   2. Replace template_acknowledgement with exactly MODEL_REVIEWED only after
+#      checking topology/coordinates, parameter compatibility, restraint PDBs,
+#      box geometry, and the intended protocol.
+#   3. Use a coordinate PDB that has exactly the atom order/atom count expected
+#      by the PSF. Do not reuse another protein's restraint or restart files.
+#
+# Units: distance Angstrom, timestep fs, temperature K, pressure bar,
+#        NAMD positional-restraint constants conventionally kcal/mol/Angstrom^2.
+# Paths are interpreted relative to the NAMD process working directory.
+# =============================================================================
+
+set template_acknowledgement "EDIT_ME"
+if {$template_acknowledgement ne "MODEL_REVIEWED"} {
+    puts stderr "ERROR: review all variables and change template_acknowledgement to MODEL_REVIEWED."
+    exit 1
+}
+
+# ---- Required system files: replace CHANGE_ME paths ----
+set run_label "CHANGE_ME_system_nvt"
+set topology_file "CHANGE_ME/system.psf"
+set coordinate_file "CHANGE_ME/system.pdb"
+# List every parameter/stream file required by THIS topology. This list is only
+# illustrative; a CHARMM36 system may need additional carbohydrate/ion/ligand files.
+set parameter_files [list \
+    "CHANGE_ME/par_all36m_prot.prm" \
+    "CHANGE_ME/toppar_water_ions.str" \
+]
+
+proc require_file {path label} {
+    if {[string first "CHANGE_ME" $path] >= 0 || ![file exists $path]} {
+        puts stderr "ERROR: $label path is unresolved or does not exist: $path"
+        exit 1
+    }
+}
+proc require_positive_number {value label} {
+    if {![string is double -strict $value]} {
+        puts stderr "ERROR: $label must be numeric; received '$value'"
+        exit 1
+    }
+    if {$value <= 0.0} {
+        puts stderr "ERROR: $label must be > 0; received '$value'"
+        exit 1
+    }
+}
+proc require_positive_integer {value label} {
+    if {![string is integer -strict $value] || $value < 1} {
+        puts stderr "ERROR: $label must be a positive integer; received '$value'"
+        exit 1
+    }
+}
+if {[string first "CHANGE_ME" $run_label] >= 0} {
+    puts stderr "ERROR: edit run_label before use."
+    exit 1
+}
+require_file $topology_file "PSF topology"
+require_file $coordinate_file "initial coordinates"
+foreach parameter_file $parameter_files {
+    require_file $parameter_file "force-field parameter"
+}
+
+# ---- Simulation variables: review and change for your system ----
+set temperature_K 310.0
+set timestep_fs 2.0            ;# 2 fs is appropriate only with appropriate H-bond constraints
+set minimization_steps 20000
+set nvt_steps 500000
+set output_dir "output_nvt"
+set first_timestep 0
+set langevin_damping_per_ps 1.0
+
+# Orthorhombic periodic cell in Angstrom. Replace with actual, validated values.
+# For triclinic cells, replace cellBasisVector1/2/3 with the actual vectors.
+set box_a_A 60.0
+set box_b_A 60.0
+set box_c_A 60.0
+set origin_x_A 0.0
+set origin_y_A 0.0
+set origin_z_A 0.0
+
+# Nonbonded settings (Angstrom). pairlistdist should exceed cutoff.
+set cutoff_A 12.0
+set switch_distance_A 10.0
+set pairlist_A 14.0
+set output_frequency_steps 5000
+set pme_grid_spacing_A 1.0
+
+# Optional positional restraints. To enable, prepare two topology-order-matched
+# PDBs: reference coordinates, and per-atom spring constants in the selected
+# PDB column. Zero values mean unrestrained atoms. Check PDB field precision.
+set use_position_restraints 0
+set restraint_reference_file "CHANGE_ME/restraint_reference.pdb"
+set restraint_force_file "CHANGE_ME/restraint_force_constants.pdb"
+set restraint_force_column "B"
+set constraint_scaling 1.0
+
+
+foreach {value label} [list \
+    $temperature_K temperature_K \
+    $timestep_fs timestep_fs \
+    $langevin_damping_per_ps langevin_damping_per_ps \
+    $box_a_A box_a_A $box_b_A box_b_A $box_c_A box_c_A \
+    $cutoff_A cutoff_A $switch_distance_A switch_distance_A \
+    $pairlist_A pairlist_A $pme_grid_spacing_A pme_grid_spacing_A] {
+    require_positive_number $value $label
+}
+require_positive_integer $minimization_steps minimization_steps
+require_positive_integer $nvt_steps nvt_steps
+require_positive_integer $output_frequency_steps output_frequency_steps
+if {$switch_distance_A >= $cutoff_A} {
+    puts stderr "ERROR: switch_distance_A must be less than cutoff_A."
+    exit 1
+}
+if {$pairlist_A <= $cutoff_A} {
+    puts stderr "ERROR: pairlist_A should exceed cutoff_A."
+    exit 1
+}
+if {![string is boolean -strict $use_position_restraints]} {
+    puts stderr "ERROR: use_position_restraints must be 0/1 or a Tcl boolean."
+    exit 1
+}
+require_positive_number $constraint_scaling constraint_scaling
+if {$restraint_force_column ni {X Y Z O B}} {
+    puts stderr "ERROR: restraint_force_column must be one of X, Y, Z, O or B."
+    exit 1
+}
+
+
+file mkdir $output_dir
+set outputname "$output_dir/$run_label"
+
+structure $topology_file
+coordinates $coordinate_file
+firsttimestep $first_timestep
+paraTypeCharmm on
+foreach parameter_file $parameter_files {
+    parameters $parameter_file
+}
+
+exclude scaled1-4
+oneFourScaling 1.0
+cutoff $cutoff_A
+switching on
+switchdist $switch_distance_A
+pairlistdist $pairlist_A
+stepspercycle 20
+pairlistsPerCycle 2
+pairlistShrink 0.01
+pairlistGrow 0.01
+pairlistTrigger 0.30
+splitPatch hydrogen
+hgroupCutoff 2.5
+
+temperature $temperature_K
+timestep $timestep_fs
+rigidBonds all
+rigidTolerance 0.00000001
+rigidIterations 100
+useSettle on
+nonbondedFreq 1
+fullElectFrequency 1
+
+langevin on
+langevinDamping $langevin_damping_per_ps
+langevinTemp $temperature_K
+langevinHydrogen on
+
+cellBasisVector1 $box_a_A 0 0
+cellBasisVector2 0 $box_b_A 0
+cellBasisVector3 0 0 $box_c_A
+cellOrigin $origin_x_A $origin_y_A $origin_z_A
+wrapAll on
+wrapWater on
+wrapNearest off
+PME yes
+PMEGridSpacing $pme_grid_spacing_A
+
+outputName $outputname
+restartfreq $output_frequency_steps
+dcdfreq $output_frequency_steps
+dcdUnitCell yes
+xstFreq $output_frequency_steps
+outputEnergies $output_frequency_steps
+outputTiming $output_frequency_steps
+
+if {$use_position_restraints} {
+    require_file $restraint_reference_file "positional-restraint reference PDB"
+    require_file $restraint_force_file "positional-restraint force-constant PDB"
+    constraints on
+    consref $restraint_reference_file
+    conskfile $restraint_force_file
+    conskcol $restraint_force_column
+    constraintScaling $constraint_scaling
+}
+
+minimize $minimization_steps
+reinitvels $temperature_K
+run $nvt_steps

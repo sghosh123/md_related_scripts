@@ -1,0 +1,196 @@
+# =============================================================================
+# GENERAL NAMD NPT CONTINUATION TEMPLATE — NOT A PRE-VALIDATED SYSTEM SETUP
+#
+# Start from a completed NAMD run that wrote matching .restart.coor,
+# .restart.vel and .restart.xsc files. Keep the SAME PSF and compatible
+# CHARMM parameter set as the previous stage. Set restart_step to the actual
+# global timestep at the end of that checkpoint.
+#
+# Replace all CHANGE_ME paths and the acknowledgement before running.
+# Distances Angstrom, timestep fs, temperature K, target pressure bar.
+# Input/output paths are interpreted relative to the NAMD process working directory.
+# =============================================================================
+
+set template_acknowledgement "EDIT_ME"
+if {$template_acknowledgement ne "MODEL_REVIEWED"} {
+    puts stderr "ERROR: review all variables and change template_acknowledgement to MODEL_REVIEWED."
+    exit 1
+}
+
+set run_label "CHANGE_ME_system_npt"
+set topology_file "CHANGE_ME/system.psf"
+set parameter_files [list \
+    "CHANGE_ME/par_all36m_prot.prm" \
+    "CHANGE_ME/toppar_water_ions.str" \
+]
+set previous_output_base "CHANGE_ME/output_nvt/CHANGE_ME_system_nvt"
+set restart_step 500000
+set npt_steps 1000000
+set output_dir "output_npt"
+
+proc require_file {path label} {
+    if {[string first "CHANGE_ME" $path] >= 0 || ![file exists $path]} {
+        puts stderr "ERROR: $label path is unresolved or does not exist: $path"
+        exit 1
+    }
+}
+proc require_positive_number {value label} {
+    if {![string is double -strict $value]} {
+        puts stderr "ERROR: $label must be numeric; received '$value'"
+        exit 1
+    }
+    if {$value <= 0.0} {
+        puts stderr "ERROR: $label must be > 0; received '$value'"
+        exit 1
+    }
+}
+proc require_positive_integer {value label} {
+    if {![string is integer -strict $value] || $value < 1} {
+        puts stderr "ERROR: $label must be a positive integer; received '$value'"
+        exit 1
+    }
+}
+proc require_nonnegative_integer {value label} {
+    if {![string is integer -strict $value] || $value < 0} {
+        puts stderr "ERROR: $label must be a non-negative integer; received '$value'"
+        exit 1
+    }
+}
+require_file $topology_file "PSF topology"
+foreach parameter_file $parameter_files {
+    require_file $parameter_file "force-field parameter"
+}
+set restart_coor "${previous_output_base}.restart.coor"
+set restart_vel "${previous_output_base}.restart.vel"
+set restart_xsc "${previous_output_base}.restart.xsc"
+require_file $restart_coor "restart coordinates"
+require_file $restart_vel "restart velocities"
+require_file $restart_xsc "restart extended-system box"
+if {[string first "CHANGE_ME" $run_label] >= 0} {
+    puts stderr "ERROR: edit run_label before use."
+    exit 1
+}
+
+set temperature_K 310.0
+set timestep_fs 2.0
+set langevin_damping_per_ps 1.0
+set target_pressure_bar 1.01325
+set piston_period_fs 200.0
+set piston_decay_fs 100.0
+set output_frequency_steps 5000
+set cutoff_A 12.0
+set switch_distance_A 10.0
+set pairlist_A 14.0
+set pme_grid_spacing_A 1.0
+
+# Optional positional restraints. The reference/force PDB files must correspond
+# atom-for-atom to the PSF and be appropriate for this continuation stage.
+set use_position_restraints 0
+set restraint_reference_file "CHANGE_ME/restraint_reference.pdb"
+set restraint_force_file "CHANGE_ME/restraint_force_constants.pdb"
+set restraint_force_column "B"
+set constraint_scaling 1.0
+
+
+foreach {value label} [list \
+    $temperature_K temperature_K $timestep_fs timestep_fs \
+    $langevin_damping_per_ps langevin_damping_per_ps \
+    $target_pressure_bar target_pressure_bar $piston_period_fs piston_period_fs \
+    $piston_decay_fs piston_decay_fs $cutoff_A cutoff_A \
+    $switch_distance_A switch_distance_A $pairlist_A pairlist_A \
+    $pme_grid_spacing_A pme_grid_spacing_A] {
+    require_positive_number $value $label
+}
+require_nonnegative_integer $restart_step restart_step
+require_positive_integer $npt_steps npt_steps
+require_positive_integer $output_frequency_steps output_frequency_steps
+if {$switch_distance_A >= $cutoff_A} {
+    puts stderr "ERROR: switch_distance_A must be less than cutoff_A."
+    exit 1
+}
+if {$pairlist_A <= $cutoff_A} {
+    puts stderr "ERROR: pairlist_A should exceed cutoff_A."
+    exit 1
+}
+if {![string is boolean -strict $use_position_restraints]} {
+    puts stderr "ERROR: use_position_restraints must be 0/1 or a Tcl boolean."
+    exit 1
+}
+require_positive_number $constraint_scaling constraint_scaling
+if {$restraint_force_column ni {X Y Z O B}} {
+    puts stderr "ERROR: restraint_force_column must be one of X, Y, Z, O or B."
+    exit 1
+}
+
+
+file mkdir $output_dir
+set outputname "$output_dir/$run_label"
+
+structure $topology_file
+firsttimestep $restart_step
+paraTypeCharmm on
+foreach parameter_file $parameter_files {
+    parameters $parameter_file
+}
+binCoordinates $restart_coor
+binVelocities $restart_vel
+extendedSystem $restart_xsc
+
+temperature $temperature_K
+exclude scaled1-4
+oneFourScaling 1.0
+cutoff $cutoff_A
+switching on
+switchdist $switch_distance_A
+pairlistdist $pairlist_A
+stepspercycle 20
+pairlistsPerCycle 2
+pairlistShrink 0.01
+pairlistGrow 0.01
+pairlistTrigger 0.30
+splitPatch hydrogen
+hgroupCutoff 2.5
+
+timestep $timestep_fs
+rigidBonds all
+rigidTolerance 0.00000001
+rigidIterations 100
+useSettle on
+nonbondedFreq 1
+fullElectFrequency 1
+
+langevin on
+langevinDamping $langevin_damping_per_ps
+langevinTemp $temperature_K
+langevinHydrogen on
+useGroupPressure yes
+useFlexibleCell no
+useConstantRatio no
+LangevinPiston on
+LangevinPistonTarget $target_pressure_bar
+LangevinPistonPeriod $piston_period_fs
+LangevinPistonDecay $piston_decay_fs
+LangevinPistonTemp $temperature_K
+
+# Cell vectors are restored from the .restart.xsc file via extendedSystem.
+PME yes
+PMEGridSpacing $pme_grid_spacing_A
+outputName $outputname
+restartfreq $output_frequency_steps
+dcdfreq $output_frequency_steps
+dcdUnitCell yes
+xstFreq $output_frequency_steps
+outputEnergies $output_frequency_steps
+outputTiming $output_frequency_steps
+
+if {$use_position_restraints} {
+    require_file $restraint_reference_file "positional-restraint reference PDB"
+    require_file $restraint_force_file "positional-restraint force-constant PDB"
+    constraints on
+    consref $restraint_reference_file
+    conskfile $restraint_force_file
+    conskcol $restraint_force_column
+    constraintScaling $constraint_scaling
+}
+
+run $npt_steps

@@ -1,0 +1,18 @@
+{
+  "time_scale": 1.0,
+  "time_offset": 0.0,
+  "time_unit": "ps",
+  "pairs": [
+    {
+      "label": "Cu_to_Cys16_SG",
+      "selection_a": "resid 16 and name SG",
+      "selection_b": "resname CU1"
+    },
+    {
+      "label": "Cys18_SG_to_Lys65_NZ",
+      "selection_a": "resid 18 and name SG",
+      "selection_b": "resid 65 and name NZ"
+    }
+  ],
+  "notes": "Selections are based on historical orientation-analysis scripts and are illustrative, not guaranteed unique for every topology. Validate that each selects exactly one atom in your input. The old scripts multiplied ts.time by 2 and in some cases subtracted 200; those conversions are intentionally not imposed here because their provenance is unclear."
+}
