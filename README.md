@@ -2,7 +2,7 @@
 
 A reproducible Python toolkit for analyzing Cu(I) coordination and protein dynamics in copper-trafficking systems, including chaperone–metal-binding-domain (MBD) association, cysteine-centered environments, contact networks, and structural visualization.
 
-> **Status:** development snapshot v0.3.0. The analysis utilities are tested on synthetic trajectories. Independent, configurable OpenMM restraint and NAMD equilibration/continuation templates are now included; each is explicitly marked as a template and requires system-specific input/parameter review before running.
+
 
 ## Included workflows
 
@@ -91,9 +91,7 @@ Read each template README and [`docs/simulation-setups-audit.md`](docs/simulatio
 6. Make selected groups whole before interpreting centers of geometry/mass.
 7. The independent simulation templates are starting points, not chemically validated copper models; the audit records specific legacy discrepancies and unresolved provenance issues.
 
-## Source migration
 
-The reusable workflows were identified from reviewed archives including `holo_sim.zip`, `holo_sim_3_coord.zip`, `neighbor_test.zip`, `colvar.zip`, `restrain_test.zip`, the human/yeast chaperone/MBD snapshots, and the yeast complex archive. No research trajectory/output collection is copied here. The full migration table and known limitations are in [`docs/workflow-catalog.md`](docs/workflow-catalog.md).
 
 ### OpenMM copper-restraint template
 
