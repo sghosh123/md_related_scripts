@@ -1,6 +1,6 @@
-# Repository integration report — v0.3.0 development snapshot
+# Repository integration report — v0.3.0 baseline snapshot
 
-## Outcome
+## Outcome (baseline v0.3.0)
 
 The initial distance-analysis scaffold has been expanded into a modular trajectory-analysis toolkit and now includes generic simulation templates. The migration focuses on reusing analytical behavior rather than bulk-copying historical source/output trees. Historical scripts often hardcoded paths, selections, frame counts, atom indices, and time conversions; maintained tools expose these as explicit inputs instead.
 
@@ -40,3 +40,10 @@ The original production scripts are still not copied verbatim. Their specific in
 ## Release boundary
 
 This is a development snapshot. Before public publication, pick a license, add a citation/metadata record, verify that all migrated source patterns can be redistributed, and run representative commands on the actual research systems with documented input checksums and expected observables.
+
+
+## v0.4.0a1 integration draft
+
+The following updates are layered on top of the v0.3.0 baseline: PBC-aware interface geometry primitives; an eight-distance/four-orientation-angle Cα feature pipeline with strict selection validation and explicit provenance; a streaming interfacial heavy-atom contact iterator/CLI; and optional binary presence columns for configured multi-distance analyses. The public package namespace remains `copper_trafficking`; no second competing package namespace was added.
+
+The new tests are synthetic regression tests only. They do not establish that the default atom selections, orientation vector endpoints, force-field model, or interpretations are correct for the actual copper-trafficking simulation. Validate representative real frames before scientific use. The `v0.4.0a1` code version is a pre-release checkpoint and should not be tagged as a final research release yet.

@@ -2,12 +2,14 @@
 
 A reproducible Python toolkit for analyzing Cu(I) coordination and protein dynamics in copper-trafficking systems, including chaperone–metal-binding-domain (MBD) association, cysteine-centered environments, contact networks, and structural visualization.
 
-
+> **Status:** integration draft v0.4.0a1. Existing workflows are preserved, and interface-feature and streaming-contact tools have been added with synthetic tests. No production-system regression test has been completed yet. OpenMM/NAMD files remain guarded, system-specific templates that require independent model/parameter review before running.
 
 ## Included workflows
 
-- **Atom-pair distances:** single or multiple named distances through trajectories, with per-frame periodic-boundary reporting.
+- **Atom-pair distances:** single or multiple named distances through trajectories, with per-frame periodic-boundary reporting and optional binary proximity columns.
 - **Neighbor/contact analysis:** PBC-aware atom-pair contacts, unique neighbor atom/residue counts per frame, and residue-level contact occupancy.
+- **Streaming interfacial contacts:** long-form heavy-atom contacts between two explicit selections, written incrementally to avoid retaining all contacts in memory.
+- **Interface feature vectors:** eight inter-protein Cα distances and four orientation angles, with validated single-atom selections, PBC-aware geometry, units in column names, and trajectory/segment provenance.
 - **Hydrogen-bond geometry screen:** topology-bonded donor–hydrogen pairs, D–A distance, and D–H–A angle criteria.
 - **Distribution plots:** histograms of named CSV columns or whitespace-delimited legacy data, without hardcoded row counts.
 - **Torsions and binding-loop conformations:** explicitly defined four-atom dihedrals plus a phi/psi scatter plot helper.
@@ -25,6 +27,8 @@ A reproducible Python toolkit for analyzing Cu(I) coordination and protein dynam
 ├── scripts/                       # User-facing CLI tools
 ├── simulation_templates/openmm/   # Config-driven bond/angle/torsion-restraint runner
 ├── src/copper_trafficking/        # Reusable analysis functions
+│   ├── geometry.py                # PBC-aware distances, displacements and angles
+│   └── interface_features.py      # 8 distances + 4 orientation angles
 ├── tests/                         # Unit and synthetic trajectory integration tests
 ├── simulation_templates/namd/     # NVT and NPT templates with review gates
 └── visualization/vmd/             # Generic VMD representation/frame-export helpers
@@ -55,7 +59,31 @@ python scripts/analyze_distance.py \
   --output-plot results/cu_cys16.png
 ```
 
-Selections must resolve to exactly one atom. The tool writes distances in Å. MDAnalysis trajectory time is used by default; supply `--time-scale`, `--time-offset`, and `--time-unit` only when the conversion has been independently verified.
+Selections must resolve to exactly one atom. The tool writes distances in Å. MDAnalysis trajectory time is used by default; supply `--time-scale`, `--time-offset`, and `--time-unit` only when the conversion has been independently verified. The multi-distance tool can additionally write `<label>_present` columns with `--presence-cutoff 3.0`, for example; that column means distance at or below the supplied cutoff, not chemical bond formation.
+
+### Inter-protein interface features
+
+```bash
+python scripts/analyze_interface_features.py \
+  --topology system.psf --trajectory trajectory.dcd \
+  --trajectory-id T7 --segment-id part1 \
+  --selections-json configs/interface-features.example.json \
+  --output-csv results/interface_features_T7_part1.csv
+```
+
+The bundled selections reproduce a specific yeast MBD/chaperone feature definition and must be checked against your topology. The output has four angle columns (`*_deg`) and eight distance columns (`*_A`), plus trajectory ID, segment ID, local frame, time metadata, and whether valid unit-cell dimensions enabled PBC correction. Override selections with a reviewed JSON file for other systems.
+
+### Stream interfacial heavy-atom contacts
+
+```bash
+python scripts/analyze_interface_contacts.py \
+  --topology system.psf --trajectory trajectory.dcd \
+  --selection-a 'protein and segid A and not name H*' \
+  --selection-b 'protein and segid B and not name H*' \
+  --cutoff 4.5 --output-csv results/interfacial_contacts.csv
+```
+
+This writes one row per atom-pair contact within the cutoff and streams rows to disk. It complements `analyze_neighbors.py`, which retains per-frame summaries and residue/contact occupancy statistics.
 
 ### Cysteine-centered water contacts
 
@@ -90,8 +118,11 @@ Read each template README and [`docs/simulation-setups-audit.md`](docs/simulatio
 5. Treat time scaling/offsets, restraint constants/targets, and cutoffs as scientific choices that must be documented.
 6. Make selected groups whole before interpreting centers of geometry/mass.
 7. The independent simulation templates are starting points, not chemically validated copper models; the audit records specific legacy discrepancies and unresolved provenance issues.
+8. Interface-feature selections and orientation-vector definitions are system-specific. Confirm topology IDs, vector endpoints, PBC behavior, units and results on manually inspected frames before using the features for clustering or enhanced sampling.
 
+## Source migration
 
+The reusable workflows were identified from reviewed archives including `holo_sim.zip`, `holo_sim_3_coord.zip`, `neighbor_test.zip`, `colvar.zip`, `restrain_test.zip`, the human/yeast chaperone/MBD snapshots, and the yeast complex archive. No research trajectory/output collection is copied here. The full migration table and known limitations are in [`docs/workflow-catalog.md`](docs/workflow-catalog.md).
 
 ### OpenMM copper-restraint template
 

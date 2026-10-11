@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Iterator
 from typing import Any
 import numpy as np
 
@@ -173,3 +174,75 @@ def residue_pair_contact_frequency(contact_rows: list[dict[str, Any]], n_frames:
             "minimum_distance_A": min_by_pair[pair],
         })
     return rows
+
+
+
+def iter_interfacial_contacts(
+    universe: Any,
+    selection_a: str = "protein and segid A and not name H*",
+    selection_b: str = "protein and segid B and not name H*",
+    cutoff_angstrom: float = 4.5,
+    *,
+    trajectory_id: str = "trajectory",
+    segment_id: str | int = 0,
+    time_scale: float = 1.0,
+    time_offset: float = 0.0,
+    time_unit: str = "ps",
+) -> Iterator[dict[str, Any]]:
+    """Yield interfacial heavy-atom contacts without storing a full trajectory's output.
+
+    Unlike :func:`neighbor_contacts`, which returns all rows and per-frame summaries,
+    this iterator yields only atom pairs at or below the specified cutoff. Distances and
+    cutoffs are in Å. Each row carries segment/frame provenance and whether PBC was applied.
+    Both selections must be non-empty; missing selections raise instead of returning no rows.
+    """
+    from MDAnalysis.lib.distances import capped_distance
+
+    if not np.isfinite(cutoff_angstrom) or cutoff_angstrom <= 0:
+        raise ValueError("cutoff_angstrom must be a finite positive number")
+    if not np.isfinite(time_scale) or not np.isfinite(time_offset):
+        raise ValueError("time_scale and time_offset must be finite numbers")
+    if not isinstance(time_unit, str) or not time_unit.strip():
+        raise ValueError("time_unit must be a non-empty string")
+
+    group_a = universe.select_atoms(selection_a)
+    group_b = universe.select_atoms(selection_b)
+    if len(group_a) == 0:
+        raise ValueError(f"selection_a matched no atoms: {selection_a!r}")
+    if len(group_b) == 0:
+        raise ValueError(f"selection_b matched no atoms: {selection_b!r}")
+
+    def generate() -> Iterator[dict[str, Any]]:
+        for ts in universe.trajectory:
+            dimensions = ts.dimensions if valid_box_dimensions(ts.dimensions) else None
+            pairs, distances = capped_distance(
+                group_a.positions,
+                group_b.positions,
+                max_cutoff=float(cutoff_angstrom),
+                box=dimensions,
+                return_distances=True,
+            )
+            for (idx_a, idx_b), distance in zip(pairs, distances, strict=True):
+                atom_a = group_a[int(idx_a)]
+                atom_b = group_b[int(idx_b)]
+                yield {
+                    "trajectory_id": str(trajectory_id),
+                    "segment_id": str(segment_id),
+                    "local_frame": int(ts.frame),
+                    "time": scaled_time(ts, time_scale, time_offset),
+                    "time_unit": time_unit,
+                    "pbc_applied": dimensions is not None,
+                    "atom_a_index": int(atom_a.index),
+                    "atom_a_segid": str(getattr(atom_a, "segid", "")),
+                    "atom_a_resid": int(atom_a.resid),
+                    "atom_a_resname": str(atom_a.resname),
+                    "atom_a_name": str(atom_a.name),
+                    "atom_b_index": int(atom_b.index),
+                    "atom_b_segid": str(getattr(atom_b, "segid", "")),
+                    "atom_b_resid": int(atom_b.resid),
+                    "atom_b_resname": str(atom_b.resname),
+                    "atom_b_name": str(atom_b.name),
+                    "distance_A": float(distance),
+                }
+
+    return generate()

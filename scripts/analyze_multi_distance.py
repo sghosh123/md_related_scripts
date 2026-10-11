@@ -24,6 +24,9 @@ def main() -> int:
     parser.add_argument("--output-csv", required=True)
     parser.add_argument("--output-plot", help="Optional plot of all distance series")
     parser.add_argument("--no-pbc", action="store_true")
+    parser.add_argument("--presence-cutoff", type=float, help="Optional Å cutoff; add a binary <label>_present column")
+    parser.add_argument("--trajectory-id", help="Stable trajectory identifier; defaults to the trajectory filename stem")
+    parser.add_argument("--segment-id", default="0", help="Trajectory segment identifier (default: 0)")
     args = parser.parse_args()
     try:
         cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
@@ -40,6 +43,9 @@ def main() -> int:
     for pair in pairs:
         if not isinstance(pair.get("selection_a"), str) or not isinstance(pair.get("selection_b"), str):
             raise SystemExit("Every pair needs string fields 'selection_a' and 'selection_b'.")
+    if args.presence_cutoff is not None and (not np.isfinite(args.presence_cutoff) or args.presence_cutoff <= 0):
+        raise SystemExit("--presence-cutoff must be a finite positive distance in Å.")
+
     scale = float(cfg.get("time_scale", 1.0))
     offset = float(cfg.get("time_offset", 0.0))
     time_unit = str(cfg.get("time_unit", "ps"))
@@ -65,14 +71,24 @@ def main() -> int:
 
     rows = []
     no_box_frames = 0
+    trajectory_id = args.trajectory_id or Path(args.trajectory).stem
     for ts in universe.trajectory:
         has_box = valid_box_dimensions(ts.dimensions)
         pbc = bool(has_box and not args.no_pbc)
         if not has_box:
             no_box_frames += 1
-        row = {"frame": int(ts.frame), f"time_{time_unit}": scaled_time(ts, scale, offset), "pbc_applied": pbc}
+        row = {
+            "trajectory_id": trajectory_id,
+            "segment_id": str(args.segment_id),
+            "frame": int(ts.frame),
+            f"time_{time_unit}": scaled_time(ts, scale, offset),
+            "pbc_applied": pbc,
+        }
         for label, atom_a, atom_b in selected:
-            row[label + "_distance_A"] = float(calc_bonds(atom_a.positions, atom_b.positions, box=ts.dimensions if pbc else None)[0])
+            distance = float(calc_bonds(atom_a.positions, atom_b.positions, box=ts.dimensions if pbc else None)[0])
+            row[label + "_distance_A"] = distance
+            if args.presence_cutoff is not None:
+                row[label + "_present"] = int(distance <= args.presence_cutoff)
         rows.append(row)
     if not rows:
         raise SystemExit("The trajectory contains no frames.")
@@ -86,7 +102,8 @@ def main() -> int:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
-    print(f"Analysed {len(rows)} frames across {len(selected)} distance pair(s); wrote {out}")
+    presence_note = f"; presence cutoff={args.presence_cutoff:g} Å" if args.presence_cutoff is not None else ""
+    print(f"Analysed {len(rows)} frames across {len(selected)} distance pair(s){presence_note}; wrote {out}")
 
     if args.output_plot:
         import matplotlib

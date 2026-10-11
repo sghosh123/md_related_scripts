@@ -1,0 +1,13 @@
+{
+  "selections": {
+    "A1": "segid A and resid 56 and name CA",
+    "A2": "segid A and resid 63 and name CA",
+    "B1": "segid A and resid 18 and name CA",
+    "B2": "segid A and resid 26 and name CA",
+    "X1": "segid B and resid 55 and name CA",
+    "X2": "segid B and resid 62 and name CA",
+    "Y1": "segid B and resid 18 and name CA",
+    "Y2": "segid B and resid 25 and name CA"
+  },
+  "notes": "System-specific starting selections; verify segment IDs, residue numbering, and exactly-one-atom selection cardinality against the supplied topology. Distances are output in Å and angles in degrees."
+}

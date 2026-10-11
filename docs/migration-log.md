@@ -1,5 +1,17 @@
 # Migration log
 
+## v0.4.0a1 — interface feature integration and scalable contact output
+
+| New/maintained component | Migration summary | Important scientific correction |
+|---|---|---|
+| `src/copper_trafficking/geometry.py` | Consolidates minimum-image displacement, PBC-aware distance and angle helpers under the existing `copper_trafficking` package | Uses MDAnalysis box validation; invalid/missing dimensions do not silently invoke PBC correction |
+| `src/copper_trafficking/interface_features.py` | Integrates the 8-distance/4-angle interface feature vector from the earlier standalone starter | Exactly-one-atom selections are required; output units and trajectory/segment/local-frame provenance are explicit; orientations use named vector endpoints |
+| `scripts/analyze_interface_features.py` and `configs/interface-features.example.json` | Adds a configurable feature extraction command | Defaults are system-specific and require selection validation; time unit/scale/offset are explicit flags |
+| `iter_interfacial_contacts()` and `scripts/analyze_interface_contacts.py` | Adds streaming long-form heavy-atom contact output for large trajectories | Avoids retaining all contact rows in memory; it complements rather than replaces occupancy summaries from `analyze_neighbors.py` |
+| `scripts/analyze_multi_distance.py` | Adds optional binary `<label>_present` columns via `--presence-cutoff`, plus trajectory and segment identifiers | A proximity flag describes a user-defined distance criterion, not a chemical bond or mechanistic event |
+
+This is an integration draft, not a validated scientific release. Synthetic tests verify implementation behavior. Before scientific use, validate selections, orientation definitions, PBC handling, time conversion and row counts against representative frames from the original research trajectories. The repository license remains unresolved.
+
 ## v0.3.0 — independent simulation templates and audit corrections
 
 | New/maintained component | Migration summary | Important scientific correction |

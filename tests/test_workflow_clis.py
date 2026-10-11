@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 import numpy as np
+import pytest
 import MDAnalysis as mda
 from MDAnalysis.coordinates.DCD import DCDWriter
 from MDAnalysis.coordinates.PDB import PDBWriter
@@ -65,6 +66,52 @@ def read_csv(path):
         return list(csv.DictReader(handle))
 
 
+def test_interface_feature_cli_writes_twelve_features_and_provenance(tmp_path):
+    topology, trajectory = make_system(
+        tmp_path,
+        names=["CA"] * 8,
+        resids=[56, 63, 18, 26, 55, 62, 18, 25],
+        resnames=["ALA"] * 8,
+        segids=["A", "A", "A", "A", "B", "B", "B", "B"],
+        positions=[[[1, 1, 1], [2, 1, 1], [1, 2, 1], [2, 2, 1],
+                    [1.4, 1, 1], [2.4, 1, 1], [1, 2.4, 1], [2, 2.4, 1]]],
+    )
+    output = tmp_path / "features.csv"
+    run_cli(
+        "analyze_interface_features.py", "--topology", topology, "--trajectory", trajectory,
+        "--trajectory-id", "T7", "--segment-id", "segment-02", "--output-csv", output,
+    )
+    rows = read_csv(output)
+    assert len(rows) == 1
+    assert rows[0]["trajectory_id"] == "T7"
+    assert rows[0]["segment_id"] == "segment-02"
+    assert rows[0]["local_frame"] == "0"
+    assert rows[0]["pbc_applied"] == "True"
+    assert float(rows[0]["d_A1X1_A"]) == pytest.approx(0.4, abs=1e-4)
+    assert float(rows[0]["d_B2Y2_A"]) == pytest.approx(0.4, abs=1e-4)
+    feature_names = [name for name in rows[0] if name.endswith("_A") or name.endswith("_deg")]
+    assert len(feature_names) == 12
+
+
+def test_streaming_interface_contact_cli_writes_contacts(tmp_path):
+    topology, trajectory = make_system(
+        tmp_path,
+        names=["CA", "CA"], resids=[1, 2], resnames=["ALA", "ALA"], segids=["A", "B"],
+        positions=[[[0.5, 0.5, 0.5], [9.5, 0.5, 0.5]], [[0.5, 0.5, 0.5], [5.5, 0.5, 0.5]]],
+    )
+    output = tmp_path / "interface_contacts.csv"
+    run_cli(
+        "analyze_interface_contacts.py", "--topology", topology, "--trajectory", trajectory,
+        "--selection-a", "segid A and name CA", "--selection-b", "segid B and name CA",
+        "--cutoff", "1.1", "--output-csv", output,
+    )
+    rows = read_csv(output)
+    assert len(rows) == 1
+    assert int(rows[0]["local_frame"]) == 0
+    assert float(rows[0]["distance_A"]) == pytest.approx(1.0, abs=1e-4)
+    assert rows[0]["pbc_applied"] == "True"
+
+
 def test_neighbor_cli_exports_contacts_and_pair_occupancy(tmp_path):
     topology, trajectory = make_system(
         tmp_path,
@@ -100,12 +147,16 @@ def test_multi_distance_cli_reads_configuration_and_writes_named_columns(tmp_pat
     }]}), encoding="utf-8")
     output = tmp_path / "distances.csv"
     run_cli("analyze_multi_distance.py", "--topology", topology, "--trajectory", trajectory,
-            "--config", config, "--output-csv", output)
+            "--config", config, "--output-csv", output, "--presence-cutoff", "2.5",
+            "--trajectory-id", "T26", "--segment-id", "part2")
     rows = read_csv(output)
     assert len(rows) == 2
     assert "Cu_Cys16_distance_A" in rows[0]
+    assert [row["Cu_Cys16_present"] for row in rows] == ["1", "0"]
     assert np.isclose(float(rows[0]["Cu_Cys16_distance_A"]), 2.0, atol=1e-4)
     assert np.isclose(float(rows[1]["Cu_Cys16_distance_A"]), 3.0, atol=1e-4)
+    assert [row["trajectory_id"] for row in rows] == ["T26", "T26"]
+    assert [row["segment_id"] for row in rows] == ["part2", "part2"]
 
 
 def test_hbond_cli_uses_pdb_bond_records_and_angle_criterion(tmp_path):
