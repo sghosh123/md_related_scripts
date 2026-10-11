@@ -119,10 +119,6 @@ Read each template README and [`docs/simulation-setups-audit.md`](docs/simulatio
 7. The independent simulation templates are starting points, not chemically validated copper models; the audit records specific legacy discrepancies and unresolved provenance issues.
 8. Interface-feature selections and orientation-vector definitions are system-specific. Confirm topology IDs, vector endpoints, PBC behavior, units and results on manually inspected frames before using the features for clustering or enhanced sampling.
 
-## Source migration
-
-The reusable workflows were identified from reviewed archives including `holo_sim.zip`, `holo_sim_3_coord.zip`, `neighbor_test.zip`, `colvar.zip`, `restrain_test.zip`, the human/yeast chaperone/MBD snapshots, and the yeast complex archive. No research trajectory/output collection is copied here. The full migration table and known limitations are in [`docs/workflow-catalog.md`](docs/workflow-catalog.md).
-
 ### OpenMM copper-restraint template
 
 ```bash
