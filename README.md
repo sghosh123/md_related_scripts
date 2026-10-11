@@ -1,8 +1,7 @@
 # Copper Trafficking Mechanism: Molecular Simulation Workflows
 
-A reproducible Python toolkit for analyzing Cu(I) coordination and protein dynamics in copper-trafficking systems, including chaperone–metal-binding-domain (MBD) association, cysteine-centered environments, contact networks, and structural visualization.
+Python toolkit for analyzing Cu(I) coordination and protein dynamics in copper-trafficking systems, including chaperone–metal-binding-domain (MBD) association, cysteine-centered environments, contact networks, and structural visualization.
 
-> **Status:** integration draft v0.4.0a2. Existing workflows are preserved, and interface-feature and streaming-contact tools have been added with synthetic tests. No production-system regression test has been completed yet. OpenMM/NAMD files remain guarded, system-specific templates that require independent model/parameter review before running.
 
 ## Included workflows
 
