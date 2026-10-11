@@ -1,0 +1,15 @@
+{
+  "note": "Illustrative only. Verify segment IDs, residue numbers, charged atom names, protonation states, and selection cardinality for your topology before analysis.",
+  "salt_bridges": [
+    {
+      "name": "Lys24_to_Asp61",
+      "selection_a": "protein and segid A and resid 24 and name NZ",
+      "selection_b": "protein and segid B and resid 61 and name OD1 OD2"
+    },
+    {
+      "name": "Lys24_to_Asp65",
+      "selection_a": "protein and segid A and resid 24 and name NZ",
+      "selection_b": "protein and segid B and resid 65 and name OD1 OD2"
+    }
+  ]
+}

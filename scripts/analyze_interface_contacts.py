@@ -13,12 +13,14 @@ if str(ROOT / "src") not in sys.path:
 
 import MDAnalysis as mda  # noqa: E402
 from copper_trafficking.contacts import iter_interfacial_contacts  # noqa: E402
+from copper_trafficking.trajectory import scaled_time  # noqa: E402
 
 FIELDS = [
     "trajectory_id", "segment_id", "local_frame", "time", "time_unit", "pbc_applied",
-    "atom_a_index", "atom_a_segid", "atom_a_resid", "atom_a_resname", "atom_a_name",
-    "atom_b_index", "atom_b_segid", "atom_b_resid", "atom_b_resname", "atom_b_name", "distance_A",
+    "atom_a_index", "atom_a_segid", "atom_a_resindex", "atom_a_resid", "atom_a_resname", "atom_a_name",
+    "atom_b_index", "atom_b_segid", "atom_b_resindex", "atom_b_resid", "atom_b_resname", "atom_b_name", "distance_A",
 ]
+FRAME_FIELDS = ["trajectory_id", "segment_id", "local_frame", "time", "time_unit"]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -34,22 +36,44 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--time-offset", type=float, default=0.0)
     parser.add_argument("--time-unit", default="ps", help="label for scaled time values")
     parser.add_argument("--output-csv", required=True)
+    parser.add_argument(
+        "--output-frame-manifest",
+        help="Optional CSV containing every analyzed frame, including frames with zero contacts; required for replicate-aware occupancy.",
+    )
     args = parser.parse_args(argv)
 
     universe = mda.Universe(args.topology, args.trajectory)
+    trajectory_id = args.trajectory_id or Path(args.trajectory).stem
     try:
         rows = iter_interfacial_contacts(
             universe,
             args.selection_a,
             args.selection_b,
             args.cutoff,
-            trajectory_id=args.trajectory_id or Path(args.trajectory).stem,
+            trajectory_id=trajectory_id,
             segment_id=args.segment_id,
             time_scale=args.time_scale,
             time_offset=args.time_offset,
             time_unit=args.time_unit,
         )
-        # Force selection/cutoff validation before creating output files.
+        # Selection validation happens when the contact iterator is created. The
+        # frame manifest is written before consuming contact rows, so zero-contact
+        # frames remain present in the denominator for occupancy estimates.
+        if args.output_frame_manifest:
+            manifest = Path(args.output_frame_manifest)
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            with manifest.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=FRAME_FIELDS)
+                writer.writeheader()
+                for ts in universe.trajectory:
+                    writer.writerow({
+                        "trajectory_id": str(trajectory_id), "segment_id": str(args.segment_id),
+                        "local_frame": int(ts.frame),
+                        "time": scaled_time(ts, args.time_scale, args.time_offset),
+                        "time_unit": args.time_unit,
+                    })
+        # Iterating universe.trajectory above does not consume the nested contact
+        # iterator; it begins at the trajectory start when first advanced.
         first = next(rows, None)
     except ValueError as exc:
         parser.error(str(exc))
