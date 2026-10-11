@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 import numpy as np
+import pandas as pd
 import pytest
 import MDAnalysis as mda
 from MDAnalysis.coordinates.DCD import DCDWriter
@@ -100,16 +101,23 @@ def test_streaming_interface_contact_cli_writes_contacts(tmp_path):
         positions=[[[0.5, 0.5, 0.5], [9.5, 0.5, 0.5]], [[0.5, 0.5, 0.5], [5.5, 0.5, 0.5]]],
     )
     output = tmp_path / "interface_contacts.csv"
+    manifest = tmp_path / "frames.csv"
     run_cli(
         "analyze_interface_contacts.py", "--topology", topology, "--trajectory", trajectory,
         "--selection-a", "segid A and name CA", "--selection-b", "segid B and name CA",
-        "--cutoff", "1.1", "--output-csv", output,
+        "--cutoff", "1.1", "--trajectory-id", "T7", "--segment-id", "part1",
+        "--output-csv", output, "--output-frame-manifest", manifest,
     )
     rows = read_csv(output)
     assert len(rows) == 1
     assert int(rows[0]["local_frame"]) == 0
     assert float(rows[0]["distance_A"]) == pytest.approx(1.0, abs=1e-4)
     assert rows[0]["pbc_applied"] == "True"
+    assert rows[0]["atom_a_resindex"] == "0"
+    manifest_rows = read_csv(manifest)
+    assert len(manifest_rows) == 2
+    assert [row["local_frame"] for row in manifest_rows] == ["0", "1"]
+    assert all(row["trajectory_id"] == "T7" and row["segment_id"] == "part1" for row in manifest_rows)
 
 
 def test_neighbor_cli_exports_contacts_and_pair_occupancy(tmp_path):
@@ -222,3 +230,40 @@ def test_rmsd_cli_aligns_frames_and_writes_output(tmp_path):
     rows = read_csv(output)
     assert len(rows) == 2
     assert max(float(row["fitted_RMSD_A"]) for row in rows) < 1e-3
+
+
+def test_salt_bridge_cli_writes_explicit_geometry(tmp_path):
+    topology, trajectory = make_system(
+        tmp_path, names=["NZ", "OD1"], resids=[24, 61], resnames=["LYS", "ASP"], segids=["A", "B"],
+        positions=[[[1, 1, 1], [4, 1, 1]]],
+    )
+    config = tmp_path / "salt.json"
+    config.write_text(json.dumps({"salt_bridges": [{"name": "Lys24_Asp61", "selection_a": "segid A and name NZ", "selection_b": "segid B and name OD1"}]}))
+    output = tmp_path / "salt.csv"
+    run_cli("analyze_salt_bridges.py", "--topology", topology, "--trajectory", trajectory,
+            "--config", config, "--cutoff", "3.5", "--output-csv", output)
+    rows = read_csv(output)
+    assert len(rows) == 1
+    assert rows[0]["bridge_name"] == "Lys24_Asp61"
+    assert float(rows[0]["minimum_distance_A"]) == pytest.approx(3.0, abs=1e-3)
+    assert rows[0]["within_cutoff"] == "True"
+
+
+def test_contact_consistency_cli_writes_replicate_summary(tmp_path):
+    contacts = tmp_path / "contacts.csv"
+    frames = tmp_path / "frames.csv"
+    pd.DataFrame([{
+        "trajectory_id": "T1", "segment_id": "0", "local_frame": 0,
+        "atom_a_segid": "A", "atom_a_resindex": 0, "atom_a_resid": 24, "atom_a_resname": "LYS",
+        "atom_b_segid": "B", "atom_b_resindex": 1, "atom_b_resid": 61, "atom_b_resname": "ASP",
+    }]).to_csv(contacts, index=False)
+    pd.DataFrame([{"trajectory_id": "T1", "segment_id": "0", "local_frame": 0},
+                  {"trajectory_id": "T1", "segment_id": "0", "local_frame": 1},
+                  {"trajectory_id": "T2", "segment_id": "0", "local_frame": 0},
+                  {"trajectory_id": "T2", "segment_id": "0", "local_frame": 1}]).to_csv(frames, index=False)
+    outdir = tmp_path / "consistency"
+    run_cli("analyze_contact_consistency.py", "--contacts", contacts, "--frames", frames, "--outdir", outdir)
+    summary = pd.read_csv(outdir / "contact_consistency_summary.tsv", sep="\t").to_dict("records")
+    assert len(summary) == 1
+    assert float(summary[0]["mean_occupancy"]) == pytest.approx(0.25)
+    assert int(summary[0]["n_trajectories_with_contact"]) == 1

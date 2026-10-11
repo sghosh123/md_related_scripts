@@ -20,8 +20,11 @@ The archive intentionally does not include the repository's `.git/` history. Nev
 
 ## If you only want to apply the overlay files
 
-Use the separate `copper-trafficking-mechanism-v0.4.0a1-overlay.zip`, which contains only changed and new paths. Extract it into the root of your existing local clone with overwrite enabled, then inspect the diff and run the tests before committing.
+Use the separate `copper-trafficking-mechanism-v0.4.0a2-web-overlay.zip`, which contains only changed and new paths. Extract it into the root of your existing local clone with overwrite enabled, then inspect the diff and run the tests before committing.
 
 ## Release boundary
 
 This build is an integration draft, not an assertion that all methods are validated on real trajectories. Check `docs/migration-log.md`, `docs/analysis-conventions.md`, and `LICENSE-STATUS.md`. The existing license status is unresolved; confirm rights and choose an appropriate license before making a public release.
+
+
+The v0.4.0a2 update adds explicit salt-bridge/charged-group geometry, full frame manifests, and replicate-aware contact-consistency summaries. Browser upload of the extracted overlay contents should be followed by the repository GitHub Actions tests; do not upload the ZIP archive as a file into the repository.

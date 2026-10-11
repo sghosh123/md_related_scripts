@@ -12,3 +12,9 @@
 ## 0.3.0
 
 See `docs/migration-log.md` for the prior simulation-template and audit-correction release notes.
+
+## 0.4.0a2
+
+- Added explicit salt-bridge/charged-group distance screens with selection validation and per-frame provenance.
+- Added complete frame-manifest export to streaming interface-contact analysis.
+- Added replicate-aware residue-pair contact consistency summaries that include zero-contact frames and pool file segments within independent trajectory IDs.

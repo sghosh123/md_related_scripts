@@ -1,7 +1,8 @@
 # Copper Trafficking Mechanism: Molecular Simulation Workflows
 
-Python toolkit for analyzing Cu(I) coordination and protein dynamics in copper-trafficking systems, including chaperone–metal-binding-domain (MBD) association, cysteine-centered environments, contact networks, and structural visualization.
+A reproducible Python toolkit for analyzing Cu(I) coordination and protein dynamics in copper-trafficking systems, including chaperone–metal-binding-domain (MBD) association, cysteine-centered environments, contact networks, and structural visualization.
 
+> **Status:** integration draft v0.4.0a2. Existing workflows are preserved, and interface-feature and streaming-contact tools have been added with synthetic tests. No production-system regression test has been completed yet. OpenMM/NAMD files remain guarded, system-specific templates that require independent model/parameter review before running.
 
 ## Included workflows
 
@@ -106,7 +107,7 @@ The repository now includes independent, editable simulation templates:
 - [`simulation_templates/namd/equilibration_nvt.conf.example`](simulation_templates/namd/equilibration_nvt.conf.example) is a fresh-start minimization/NVT template with optional positional restraints.
 - [`simulation_templates/namd/continue_npt.conf.example`](simulation_templates/namd/continue_npt.conf.example) continues from matching NAMD restart coordinates, velocities and box state.
 
-Read each template README and [`docs/simulation-setups-audit.md`](docs/simulation-setups-audit.md) before use. The numeric targets in the OpenMM example and the NAMD cell lengths are illustrative, not validated for your system. OpenMM restraint forces are additive to the selected force field, so review whether they duplicate any existing bonded terms. NAMD relative paths are interpreted from the process working directory, not automatically from the configuration file directory. Templates intentionally block production until path/settings review acknowledgements are changed; validate the actual force field, atom mapping, geometry, units, and restart continuity before a long run.
+Read each template README and [`docs/simulation-setups-audit.md`](docs/simulation-setups-audit.md) before use. The numeric targets in the OpenMM example and the NAMD cell lengths are illustrative, not validated for your system. OpenMM restraint forces are additive to the selected force field, so review whether they duplicate any existing bonded terms. NAMD relative paths are interpreted from the process working directory, not automatically from the configuration file directory. Templates intentionally block production until path/settings review acknowledgements are changed; validate the actual force field, atom mapping, geometry, units, and restart continuity before a long run. The archived legacy production files are not copied verbatim because they contain inconsistent model settings and hardcoded atom indices.
 
 ## Scientific safeguards
 
@@ -118,6 +119,10 @@ Read each template README and [`docs/simulation-setups-audit.md`](docs/simulatio
 6. Make selected groups whole before interpreting centers of geometry/mass.
 7. The independent simulation templates are starting points, not chemically validated copper models; the audit records specific legacy discrepancies and unresolved provenance issues.
 8. Interface-feature selections and orientation-vector definitions are system-specific. Confirm topology IDs, vector endpoints, PBC behavior, units and results on manually inspected frames before using the features for clustering or enhanced sampling.
+
+## Source migration
+
+The reusable workflows were identified from reviewed archives including `holo_sim.zip`, `holo_sim_3_coord.zip`, `neighbor_test.zip`, `colvar.zip`, `restrain_test.zip`, the human/yeast chaperone/MBD snapshots, and the yeast complex archive. No research trajectory/output collection is copied here. The full migration table and known limitations are in [`docs/workflow-catalog.md`](docs/workflow-catalog.md).
 
 ### OpenMM copper-restraint template
 
@@ -140,3 +145,40 @@ Large trajectories, restart files, unpublished datasets, and unreviewed third-pa
 ## Citation
 
 Until a release and citation record are created, cite the manuscript/preprint associated with the analysis and identify the repository commit used. Do not cite this toolkit alone as evidence for a mechanistic conclusion.
+
+### Salt-bridge geometry screen
+
+Run explicitly configured charged-group pair distances with `scripts/analyze_salt_bridges.py`:
+
+```bash
+python scripts/analyze_salt_bridges.py \
+  --topology system.psf --trajectory trajectory.dcd \
+  --config configs/salt-bridges.example.json --cutoff 4.0 \
+  --trajectory-id T7 --segment-id part1 \
+  --output-csv results/salt_bridge_geometry_T7_part1.csv
+```
+
+Edit the example selections to match the actual topology and protonation model first. The tool records the nearest atom-pair distance for every configured group pair and frame. Its `within_cutoff` field is a geometric proximity flag only; it does not establish a salt bridge's energetics or biological role. Empty selections fail instead of turning into zero-valued observations.
+
+### Replicate-aware contact consistency
+
+The streaming contact extractor can also write every analyzed frame (including frames with zero contacts):
+
+```bash
+python scripts/analyze_interface_contacts.py \
+  --topology system.psf --trajectory trajectory.dcd \
+  --trajectory-id T7 --segment-id part1 \
+  --output-csv results/T7_part1_contacts.csv \
+  --output-frame-manifest results/T7_part1_frames.csv
+```
+
+Collect a contacts file and matching frame manifest for each segment, preserving the same independent `trajectory_id` across segments from the same simulation. Then run:
+
+```bash
+python scripts/analyze_contact_consistency.py \
+  --contacts results/T7_part1_contacts.csv results/T8_part1_contacts.csv \
+  --frames results/T7_part1_frames.csv results/T8_part1_frames.csv \
+  --outdir results/contact_consistency
+```
+
+The summary uses trajectory IDs as independent replicates and pools their file segments. The complete frame manifest is essential because contact-only CSVs omit zero-contact frames. The reported pair universe is the union of pairs observed at least once; pairs never observed in any input are not inferred from contacts alone. Across-trajectory occupancy variation is descriptive unless independent sampling and statistical assumptions are justified.
